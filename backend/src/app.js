@@ -9,6 +9,7 @@ const env = require('./config/env');
 const healthRoutes = require('./routes/healthRoutes');
 const contentRoutes = require('./routes/contentRoutes');
 const userRoutes = require('./routes/userRoutes');
+const authRoutes = require('./routes/authRoutes');
 const notFound = require('./middleware/notFound');
 const errorHandler = require('./middleware/errorHandler');
 
@@ -30,6 +31,7 @@ app.use(hpp());
 app.use(morgan(env.NODE_ENV === 'production' ? 'combined' : 'dev'));
 
 app.use('/api', healthRoutes);
+app.use('/api/auth', authRoutes);
 app.use('/api/content', contentRoutes);
 app.use('/api/users', userRoutes);
 
