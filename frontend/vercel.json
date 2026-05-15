@@ -1,8 +1,7 @@
 {
-  "buildCommand": "npm run build",
+  "buildCommand": "pnpm run build",
   "outputDirectory": "dist",
-  "installCommand": "npm install",
-  "framework": "react-router",
+  "installCommand": "pnpm install",
   "rewrites": [
     {
       "source": "/(.*)",

@@ -120,13 +120,17 @@ router.patch(
   requireOwnership,
   validate(autosaveSchema),
   asyncHandler(async (req, res) => {
-    const content = await updateAutosave(req.params.id, req.user.id, req.body.delta);
+    const result = await updateAutosave(req.params.id, req.user.id, req.body.delta);
 
-    if (!content) {
+    if (!result) {
       return res.status(404).json({ error: 'Content not found' });
     }
 
-    return res.json({ saved: true, updatedAt: content.updatedAt });
+    if (result.saved === false) {
+      return res.json({ saved: false, reason: result.reason });
+    }
+
+    return res.json({ saved: true, updatedAt: result.updatedAt });
   })
 );
 

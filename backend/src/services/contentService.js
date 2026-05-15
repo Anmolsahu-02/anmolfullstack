@@ -51,15 +51,29 @@ async function getContentById(contentId) {
   }
 
   if (bookmarkCache !== null) {
+    logger.info(`[Redis HIT] bookmark:${contentId}`);
     content.bookmarkCount = Number.parseInt(bookmarkCache, 10);
   } else {
+    logger.info(`[Redis MISS] bookmark:${contentId}`);
     await redis.set(bookmarkKey(contentId), String(content.bookmarkCount));
   }
 
   return content;
 }
 
+function autosaveLockKey(userId, contentId) {
+  return `autosave_lock:${userId}:${contentId}`;
+}
+
 async function updateAutosave(contentId, userId, delta) {
+  // Backend throttle: ignore if same user saved this doc within 2 seconds
+  const lockKey = autosaveLockKey(userId, contentId);
+  const locked = await redis.set(lockKey, '1', 'NX', 'EX', 2);
+
+  if (!locked) {
+    return { saved: false, reason: 'throttled' };
+  }
+
   const content = await Content.findOne({ _id: contentId, authorId: userId, isDeleted: false });
 
   if (!content) {
@@ -69,7 +83,7 @@ async function updateAutosave(contentId, userId, delta) {
   content.quillDelta = delta;
   content.updatedAt = new Date();
   await content.save();
-  return content.toObject();
+  return { saved: true, updatedAt: content.updatedAt };
 }
 
 async function saveVersion(contentId, userId, delta) {
