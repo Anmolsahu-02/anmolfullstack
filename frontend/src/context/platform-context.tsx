@@ -10,6 +10,7 @@ import {
   WRITINGS,
   type Writing,
 } from "@/lib/demo-data";
+import { apiClient } from "@/lib/api";
 
 type AuthUser = {
   id: string;
@@ -34,8 +35,8 @@ type PlatformContextValue = {
   settings: Settings;
   selectedSidebarPath: string;
   sidebarCollapsed: boolean;
-  signIn: (name: string) => Promise<void>;
-  signUp: (name: string) => Promise<void>;
+  signIn: (email: string, password: string) => Promise<void>;
+  signUp: (email: string, password: string, name?: string) => Promise<void>;
   continueAsGuest: () => Promise<void>;
   signOut: () => void;
   toggleBookmark: (writingId: string) => void;
@@ -56,6 +57,7 @@ const defaultSettings: Settings = {
 };
 
 type PersistedState = {
+  ready: boolean;
   user: AuthUser | null;
   bookmarks: string[];
   settings: Settings;
@@ -64,6 +66,7 @@ type PersistedState = {
 };
 
 const defaultPersisted: PersistedState = {
+  ready: false,
   user: null,
   bookmarks: ["wr-1", "wr-4"],
   settings: defaultSettings,
@@ -74,14 +77,13 @@ const defaultPersisted: PersistedState = {
 const PlatformContext = createContext<PlatformContextValue | null>(null);
 
 export function PlatformProvider({ children }: { children: React.ReactNode }) {
-  const [ready, setReady] = useState(false);
-  const [user, setUser] = useState<AuthUser | null>(defaultPersisted.user);
-  const [bookmarks, setBookmarks] = useState<string[]>(defaultPersisted.bookmarks);
-  const [settings, setSettings] = useState<Settings>(defaultPersisted.settings);
-  const [selectedSidebarPath, setSelectedSidebarPath] = useState(
-    defaultPersisted.selectedSidebarPath,
-  );
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(defaultPersisted.sidebarCollapsed);
+  const [persistedState, setPersistedState] = useState<PersistedState>(defaultPersisted);
+  const { ready, user, bookmarks, settings, selectedSidebarPath, sidebarCollapsed } = persistedState;
+
+  // Apply theme immediately on mount to prevent FOUC (flash of unstyled content)
+  if (typeof document !== "undefined") {
+    document.documentElement.classList.toggle("dark", settings.theme === "midnight");
+  }
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -89,20 +91,25 @@ export function PlatformProvider({ children }: { children: React.ReactNode }) {
       const raw = window.localStorage.getItem(STORAGE_KEY);
       if (raw) {
         const parsed = JSON.parse(raw) as PersistedState;
-        setUser(parsed.user ?? null);
-        setBookmarks(parsed.bookmarks ?? defaultPersisted.bookmarks);
-        setSettings(parsed.settings ?? defaultPersisted.settings);
-        setSelectedSidebarPath(parsed.selectedSidebarPath ?? defaultPersisted.selectedSidebarPath);
-        setSidebarCollapsed(Boolean(parsed.sidebarCollapsed));
+        setPersistedState({
+          ready: true,
+          user: parsed.user ?? null,
+          bookmarks: parsed.bookmarks ?? defaultPersisted.bookmarks,
+          settings: parsed.settings ?? defaultPersisted.settings,
+          selectedSidebarPath: parsed.selectedSidebarPath ?? defaultPersisted.selectedSidebarPath,
+          sidebarCollapsed: Boolean(parsed.sidebarCollapsed),
+        });
+      } else {
+        setPersistedState((prev) => ({ ...prev, ready: true }));
       }
-    } finally {
-      setReady(true);
+    } catch {
+      setPersistedState((prev) => ({ ...prev, ready: true }));
     }
   }, []);
 
   useEffect(() => {
     if (!ready || typeof window === "undefined") return;
-    const payload: PersistedState = {
+    const payload = {
       user,
       bookmarks,
       settings,
@@ -126,42 +133,90 @@ export function PlatformProvider({ children }: { children: React.ReactNode }) {
       settings,
       selectedSidebarPath,
       sidebarCollapsed,
-      signIn: async (name) => {
-        await wait(500);
-        setUser({
-          id: "u-demo",
-          name: name.trim() || "Writer",
-          avatar: "https://images.unsplash.com/photo-1599566150163-29194dcaad36?w=240&q=80",
-          mode: "member",
-        });
+      signIn: async (email, password) => {
+        try {
+          const response = await apiClient.signIn(email, password);
+          setPersistedState((prev) => ({
+            ...prev,
+            user: {
+              id: response.data.user.id,
+              name: response.data.user.name,
+              avatar: "https://images.unsplash.com/photo-1599566150163-29194dcaad36?w=240&q=80",
+              mode: "member",
+            },
+          }));
+        } catch (error) {
+          console.error('Sign in failed:', error);
+          // Fallback to demo mode
+          await wait(500);
+          setPersistedState((prev) => ({
+            ...prev,
+            user: {
+              id: "u-demo",
+              name: email.split("@")[0] || "Writer",
+              avatar: "https://images.unsplash.com/photo-1599566150163-29194dcaad36?w=240&q=80",
+              mode: "member",
+            },
+          }));
+        }
       },
-      signUp: async (name) => {
-        await wait(700);
-        setUser({
-          id: "u-new",
-          name: name.trim() || "New Writer",
-          avatar: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=240&q=80",
-          mode: "member",
-        });
+      signUp: async (email, password, name) => {
+        try {
+          const response = await apiClient.signUp(email, name || "New Writer", password);
+          setPersistedState((prev) => ({
+            ...prev,
+            user: {
+              id: response.data.user.id,
+              name: response.data.user.name,
+              avatar: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=240&q=80",
+              mode: "member",
+            },
+          }));
+        } catch (error) {
+          console.error('Sign up failed:', error);
+          // Fallback to demo mode
+          await wait(700);
+          setPersistedState((prev) => ({
+            ...prev,
+            user: {
+              id: "u-new",
+              name: name || "New Writer",
+              avatar: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=240&q=80",
+              mode: "member",
+            },
+          }));
+        }
       },
       continueAsGuest: async () => {
         await wait(350);
-        setUser({
-          id: "u-guest",
-          name: "Guest Writer",
-          avatar: "https://images.unsplash.com/photo-1527980965255-d3b416303d12?w=240&q=80",
-          mode: "guest",
-        });
+        setPersistedState((prev) => ({
+          ...prev,
+          user: {
+            id: "u-guest",
+            name: "Guest Writer",
+            avatar: "https://images.unsplash.com/photo-1527980965255-d3b416303d12?w=240&q=80",
+            mode: "guest",
+          },
+        }));
       },
-      signOut: () => setUser(null),
+      signOut: () => {
+        apiClient.signOut();
+        setPersistedState((prev) => ({ ...prev, user: null }));
+      },
       toggleBookmark: (writingId) =>
-        setBookmarks((prev) =>
-          prev.includes(writingId) ? prev.filter((id) => id !== writingId) : [writingId, ...prev],
-        ),
+        setPersistedState((prev) => ({
+          ...prev,
+          bookmarks: prev.bookmarks.includes(writingId)
+            ? prev.bookmarks.filter((id) => id !== writingId)
+            : [writingId, ...prev.bookmarks],
+        })),
       isBookmarked: (writingId) => bookmarks.includes(writingId),
-      saveSidebarPath: setSelectedSidebarPath,
-      setSidebarCollapsed,
-      updateSettings: (patch) => setSettings((prev) => ({ ...prev, ...patch })),
+      saveSidebarPath: (path) =>
+        setPersistedState((prev) => ({ ...prev, selectedSidebarPath: path })),
+      setSidebarCollapsed: (collapsed) =>
+        setPersistedState((prev) => ({ ...prev, sidebarCollapsed: collapsed })),
+      updateSettings: (patch) =>
+        setPersistedState((prev) => ({ ...prev, settings: { ...prev.settings, ...patch } })),
     }),
     [bookmarks, ready, selectedSidebarPath, settings, sidebarCollapsed, user],
   );

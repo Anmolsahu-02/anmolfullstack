@@ -1,4 +1,4 @@
-import { Link, useLocation, useNavigate } from "@tanstack/react-router";
+import { Link, useLocation } from "@tanstack/react-router";
 import { motion } from "motion/react";
 import {
   BarChart3,
@@ -56,7 +56,6 @@ export function PlatformShell({
   children: React.ReactNode;
 }) {
   const location = useLocation();
-  const navigate = useNavigate();
   const {
     user,
     ready,
@@ -74,12 +73,6 @@ export function PlatformShell({
   }, [user]);
 
   const activePath = location.pathname;
-
-  useEffect(() => {
-    if (ready && !user) {
-      navigate({ to: "/sign-in" });
-    }
-  }, [navigate, ready, user]);
 
   useEffect(() => {
     if (ready) {
@@ -102,23 +95,47 @@ export function PlatformShell({
   }
 
   if (!user) {
-    return <div className="min-h-screen" />;
+    return (
+      <main className="min-h-screen grid place-items-center px-4 bg-background">
+        <section className="paper-texture max-w-md w-full rounded-2xl border border-foreground/10 shadow-paper p-6 text-center space-y-4">
+          <div className="text-xs uppercase tracking-[0.22em] text-foreground/50">
+            Session required
+          </div>
+          <h1 className="font-display text-3xl" style={{ color: "var(--ink)" }}>
+            Continue to your writing desk
+          </h1>
+          <p className="font-serif-lit italic text-foreground/70">
+            This workspace keeps your drafts, bookmarks, and reading flow behind sign-in.
+          </p>
+          <div className="flex flex-col sm:flex-row gap-3 justify-center pt-2">
+            <Link
+              to="/sign-in"
+              className="inline-flex h-11 items-center justify-center rounded-full bg-gradient-ink px-5 text-xs uppercase tracking-[0.2em] text-primary-foreground"
+            >
+              Sign in
+            </Link>
+            <Link
+              to="/sign-up"
+              className="inline-flex h-11 items-center justify-center rounded-full border border-foreground/20 px-5 text-xs uppercase tracking-[0.2em] text-foreground hover:bg-foreground hover:text-background transition-colors"
+            >
+              Create account
+            </Link>
+          </div>
+        </section>
+      </main>
+    );
   }
 
   return (
     <div className="min-h-screen flex bg-background relative overflow-hidden">
       <div className="absolute inset-0 pointer-events-none bg-spotlight opacity-40" />
-      <motion.div
+      <div
         className="absolute -top-20 -left-20 w-56 h-56 rounded-full blur-3xl opacity-20"
         style={{ background: "var(--gold)" }}
-        animate={{ x: [0, 20, -10, 0], y: [0, -10, 10, 0] }}
-        transition={{ duration: 14, repeat: Infinity, ease: "easeInOut" }}
       />
-      <motion.div
+      <div
         className="absolute -bottom-20 right-0 w-72 h-72 rounded-full blur-3xl opacity-15"
         style={{ background: "var(--maroon)" }}
-        animate={{ x: [0, -18, 12, 0], y: [0, 15, -5, 0] }}
-        transition={{ duration: 16, repeat: Infinity, ease: "easeInOut" }}
       />
 
       <aside
@@ -263,7 +280,6 @@ export function PlatformShell({
             <button
               onClick={() => {
                 signOut();
-                navigate({ to: "/" });
               }}
               className="h-9 w-9 rounded-full border border-foreground/20 text-foreground/70 hover:text-foreground transition-colors"
             >

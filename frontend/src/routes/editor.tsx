@@ -15,17 +15,31 @@ export const Route = createFileRoute("/editor")({
   component: EditorPage,
 });
 
-const DRAFT_STORAGE_KEY = "akshar.editor.draft.v1";
-
 function EditorPage() {
   const search = Route.useSearch();
   const { writings, settings } = usePlatform();
   const { draftVersions } = useDemoAnalytics();
+  const activeWritingId = search.from ?? writings[0]?.id;
   const currentWriting = useMemo(
-    () => writings.find((writing) => writing.id === search.from) ?? writings[0],
-    [search.from, writings],
+    () => writings.find((writing) => writing.id === activeWritingId) ?? writings[0],
+    [activeWritingId, writings],
   );
+  if (!currentWriting) {
+    return (
+      <PlatformShell
+        title="Editor"
+        subtitle="An immersive writing studio with live autosave and manuscript snapshots."
+      >
+        <section className="paper-texture rounded-xl border border-foreground/10 p-6 shadow-paper">
+          <p className="font-serif-lit italic text-foreground/70">
+            No draft is available yet. Create or load a manuscript to start editing.
+          </p>
+        </section>
+      </PlatformShell>
+    );
+  }
   const editorRef = useRef<HTMLDivElement>(null);
+  const draftStorageKey = `akshar.editor.draft.v1:${activeWritingId ?? "default"}`;
   const [title, setTitle] = useState(currentWriting.title);
   const [language, setLanguage] = useState(currentWriting.language);
   const [saving, setSaving] = useState(false);
@@ -33,28 +47,33 @@ function EditorPage() {
   const [snapshotPulse, setSnapshotPulse] = useState(false);
 
   useEffect(() => {
+    setTitle(currentWriting.title);
+    setLanguage(currentWriting.language);
+  }, [currentWriting.language, currentWriting.title]);
+
+  useEffect(() => {
     if (typeof window === "undefined") return;
-    const saved = window.localStorage.getItem(DRAFT_STORAGE_KEY);
+    const saved = window.localStorage.getItem(draftStorageKey);
     if (saved && editorRef.current) {
       editorRef.current.innerHTML = saved;
     } else if (editorRef.current) {
       editorRef.current.innerText = currentWriting.body;
     }
-  }, [currentWriting.body]);
+  }, [currentWriting.body, draftStorageKey]);
 
   useEffect(() => {
     const interval = setInterval(() => {
       if (!editorRef.current || typeof window === "undefined") return;
       setSaving(true);
       const value = editorRef.current.innerHTML;
-      window.localStorage.setItem(DRAFT_STORAGE_KEY, value);
+      window.localStorage.setItem(draftStorageKey, value);
       setTimeout(() => {
         setSaving(false);
         setLastSavedAt("just now");
       }, 420);
     }, 4500);
     return () => clearInterval(interval);
-  }, []);
+  }, [draftStorageKey]);
 
   const plainTextLength = editorRef.current?.innerText.length ?? 0;
   const words = Math.max(1, Math.round(plainTextLength / 5));

@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
   Outlet,
@@ -124,22 +125,41 @@ function RootComponent() {
   const pathname = useRouterState({
     select: (state) => state.location.pathname,
   });
+  
+  const loadingFallback = (
+    <div className="min-h-screen grid place-items-center bg-background px-4">
+      <div className="text-center space-y-3">
+        <div className="mx-auto h-10 w-10 rounded-full border border-foreground/15 border-t-foreground/60 animate-spin" />
+        <p className="font-serif-lit italic text-foreground/65">Loading your manuscript...</p>
+      </div>
+    </div>
+  );
 
   return (
     <QueryClientProvider client={queryClient}>
       <PlatformProvider>
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={pathname}
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -8 }}
-            transition={{ duration: 0.35, ease: "easeOut" }}
-          >
-            <Outlet />
-          </motion.div>
-        </AnimatePresence>
+        <Suspense fallback={loadingFallback}>
+            <motion.div
+              key={pathname}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.35, ease: "easeOut" }}
+            >
+              <Outlet />
+            </motion.div>
+        </Suspense>
       </PlatformProvider>
     </QueryClientProvider>
+  );
+}
+
+function RouteLoadingState() {
+  return (
+    <div className="min-h-screen grid place-items-center bg-background px-4">
+      <div className="text-center space-y-3">
+        <div className="mx-auto h-10 w-10 rounded-full border-2 border-foreground/15 border-t-foreground/60 animate-spin" />
+        <p className="text-sm uppercase tracking-[0.2em] text-foreground/55">Loading studio</p>
+      </div>
+    </div>
   );
 }
