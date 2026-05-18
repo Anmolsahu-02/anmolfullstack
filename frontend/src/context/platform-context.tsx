@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import {
   BOOKMARK_GROWTH,
   LANGUAGE_DISTRIBUTION,
@@ -8,6 +8,7 @@ import {
   WRITERS,
   WRITING_ACTIVITY,
   type Writing,
+  type WritingCategory,
 } from "@/lib/demo-data";
 import { apiClient } from "@/lib/api";
 
@@ -29,6 +30,7 @@ type AuthUser = {
   id: string;
   name: string;
   avatar: string;
+  role: 'writer' | 'reader';
   mode: "member" | "guest";
 };
 
@@ -49,7 +51,7 @@ type PlatformContextValue = {
   selectedSidebarPath: string;
   sidebarCollapsed: boolean;
   signIn: (email: string, password: string) => Promise<void>;
-  signUp: (email: string, password: string, name?: string) => Promise<void>;
+  signUp: (email: string, password: string, name: string, role: 'writer' | 'reader') => Promise<void>;
   continueAsGuest: () => Promise<void>;
   signOut: () => void;
   toggleBookmark: (writingId: string) => void;
@@ -81,7 +83,7 @@ type PersistedState = {
 const defaultPersisted: PersistedState = {
   ready: false,
   user: null,
-  bookmarks: ["wr-1", "wr-4"],
+  bookmarks: [],
   settings: defaultSettings,
   selectedSidebarPath: "/dashboard",
   sidebarCollapsed: false,
@@ -92,62 +94,12 @@ const PlatformContext = createContext<PlatformContextValue | null>(null);
 export function PlatformProvider({ children }: { children: React.ReactNode }) {
   const [persistedState, setPersistedState] = useState<PersistedState>(defaultPersisted);
   const [mongoWritings, setMongoWritings] = useState<Writing[]>([]);
-  const [mongoLoading, setMongoLoading] = useState(true);
-  const { ready: localStorageReady, user, bookmarks, settings, selectedSidebarPath, sidebarCollapsed } = persistedState;
 
-  // ready should consider both localStorage and MongoDB loading
-  const ready = localStorageReady && !mongoLoading;
-  console.log('[PlatformContext] render, localStorageReady:', localStorageReady, 'mongoLoading:', mongoLoading, 'ready:', ready, 'writings:', mongoWritings.length);
+  // `ready` is gated ONLY on localStorage — never on the backend API call.
+  // This ensures inputs on sign-in/sign-up are never blocked by a slow/dead backend.
+  const { ready, user, bookmarks, settings, selectedSidebarPath, sidebarCollapsed } = persistedState;
 
-  // Apply theme immediately on mount to prevent FOUC (flash of unstyled content)
-  if (typeof document !== "undefined") {
-    document.documentElement.classList.toggle("dark", settings.theme === "midnight");
-  }
-
-  // Fetch writings from MongoDB
-  useEffect(() => {
-    console.log('[PlatformContext] Fetching writings from MongoDB...');
-    const fetchWritings = async () => {
-      try {
-        console.log('[PlatformContext] API call starting...');
-        const response = await apiClient.getContentByLanguage('english');
-        console.log('[PlatformContext] API response:', response);
-        if (response && response.data && Array.isArray(response.data)) {
-          const categoryMap: Record<string, any> = {
-            poem: 'Poetry',
-            story: 'Stories',
-            lyrics: 'Lyrics',
-            screenplay: 'Screenplays',
-          };
-          const writings = response.data.map((content: Content): Writing => ({
-            id: content._id,
-            title: content.title,
-            category: categoryMap[content.contentType] || 'Poetry',
-            language: content.language as any,
-            genre: content.genre,
-            mood: "Tender",
-            rating: content.ratingCount > 0 ? content.ratingSum / content.ratingCount : 0,
-            bookmarks: content.bookmarkCount,
-            authorId: content.authorId,
-            excerpt: content.quillDelta?.ops?.[0]?.insert?.substring(0, 100) || "",
-            body: content.quillDelta?.ops?.map((op: any) => op.insert || "").join("") || "",
-            publishedAt: content.createdAt,
-          }));
-          setMongoWritings(writings);
-          console.log('[PlatformContext] MongoDB writings loaded:', writings.length);
-        }
-      } catch (error) {
-        console.error('[PlatformContext] Failed to fetch writings from MongoDB:', error);
-        setMongoWritings([]);
-      } finally {
-        setMongoLoading(false);
-        console.log('[PlatformContext] MongoDB loading complete');
-      }
-    };
-
-    fetchWritings();
-  }, []);
-
+  // ── Load from localStorage once on mount ─────────────────────────────────
   useEffect(() => {
     if (typeof window === "undefined") return;
     try {
@@ -157,9 +109,9 @@ export function PlatformProvider({ children }: { children: React.ReactNode }) {
         setPersistedState({
           ready: true,
           user: parsed.user ?? null,
-          bookmarks: parsed.bookmarks ?? defaultPersisted.bookmarks,
-          settings: parsed.settings ?? defaultPersisted.settings,
-          selectedSidebarPath: parsed.selectedSidebarPath ?? defaultPersisted.selectedSidebarPath,
+          bookmarks: parsed.bookmarks ?? [],
+          settings: parsed.settings ?? defaultSettings,
+          selectedSidebarPath: parsed.selectedSidebarPath ?? "/dashboard",
           sidebarCollapsed: Boolean(parsed.sidebarCollapsed),
         });
       } else {
@@ -170,121 +122,174 @@ export function PlatformProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  // ── Persist to localStorage ───────────────────────────────────────────────
   useEffect(() => {
     if (!ready || typeof window === "undefined") return;
-    const payload = {
-      user,
-      bookmarks,
-      settings,
-      selectedSidebarPath,
-      sidebarCollapsed,
-    };
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify({
+      user, bookmarks, settings, selectedSidebarPath, sidebarCollapsed,
+    }));
   }, [ready, user, bookmarks, settings, selectedSidebarPath, sidebarCollapsed]);
 
+  // ── Theme toggle — safe inside useEffect, never during render ────────────
   useEffect(() => {
     if (typeof document === "undefined") return;
     document.documentElement.classList.toggle("dark", settings.theme === "midnight");
   }, [settings.theme]);
 
+  // ── Content fetch — fire-and-forget with 3s timeout ──────────────────────
+  // Runs once after localStorage is ready. A dead backend silently yields [].
+  useEffect(() => {
+    if (!ready) return;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 3000);
+
+    (async () => {
+      try {
+        const response = await apiClient.getContentByLanguage('english');
+        if (response?.data && Array.isArray(response.data)) {
+          const categoryMap: Record<string, WritingCategory> = {
+            poem: 'Poetry',
+            story: 'Stories',
+            lyrics: 'Lyrics',
+            screenplay: 'Screenplays',
+          };
+          setMongoWritings(
+            response.data.map((content: Content): Writing => ({
+              id: content._id,
+              title: content.title,
+              category: categoryMap[content.contentType] ?? 'Poetry',
+              language: content.language as Writing['language'],
+              genre: content.genre,
+              mood: "Tender",
+              rating: content.ratingCount > 0 ? content.ratingSum / content.ratingCount : 0,
+              bookmarks: content.bookmarkCount,
+              authorId: content.authorId,
+              excerpt: content.quillDelta?.ops?.[0]?.insert?.substring(0, 100) ?? "",
+              body: content.quillDelta?.ops?.map((op) => op.insert ?? "").join("") ?? "",
+              publishedAt: content.createdAt,
+            }))
+          );
+        }
+      } catch {
+        // Backend unavailable — empty list, no crash, no UI freeze
+      } finally {
+        clearTimeout(timeout);
+      }
+    })();
+
+    return () => {
+      controller.abort();
+      clearTimeout(timeout);
+    };
+  }, [ready]);
+
+  // ── Stable callbacks via useCallback ─────────────────────────────────────
+  // All functions are stable across renders so useMemo below fires rarely.
+
+  const signIn = useCallback(async (email: string, password: string) => {
+    const response = await apiClient.signIn(email, password);
+    setPersistedState((prev) => ({
+      ...prev,
+      user: {
+        id: response.data.user.id,
+        name: response.data.user.name,
+        role: response.data.user.role,
+        avatar: "https://images.unsplash.com/photo-1599566150163-29194dcaad36?w=240&q=80",
+        mode: "member",
+      },
+    }));
+  }, []);
+
+  const signUp = useCallback(async (
+    email: string,
+    password: string,
+    name: string,
+    role: 'writer' | 'reader'
+  ) => {
+    const response = await apiClient.signUp(email, name || "New Writer", password, role);
+    setPersistedState((prev) => ({
+      ...prev,
+      user: {
+        id: response.data.user.id,
+        name: response.data.user.name,
+        role: response.data.user.role,
+        avatar: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=240&q=80",
+        mode: "member",
+      },
+    }));
+  }, []);
+
+  const continueAsGuest = useCallback(async () => {
+    setPersistedState((prev) => ({
+      ...prev,
+      user: {
+        id: "u-guest",
+        name: "Guest Writer",
+        avatar: "https://images.unsplash.com/photo-1527980965255-d3b416303d12?w=240&q=80",
+        role: "reader",
+        mode: "guest",
+      },
+    }));
+  }, []);
+
+  const signOut = useCallback(() => {
+    apiClient.signOut();
+    setPersistedState((prev) => ({ ...prev, user: null }));
+  }, []);
+
+  const toggleBookmark = useCallback((writingId: string) => {
+    setPersistedState((prev) => ({
+      ...prev,
+      bookmarks: prev.bookmarks.includes(writingId)
+        ? prev.bookmarks.filter((id) => id !== writingId)
+        : [writingId, ...prev.bookmarks],
+    }));
+  }, []);
+
+  const isBookmarked = useCallback(
+    (writingId: string) => bookmarks.includes(writingId),
+    [bookmarks]
+  );
+
+  const saveSidebarPath = useCallback((path: string) => {
+    setPersistedState((prev) => ({ ...prev, selectedSidebarPath: path }));
+  }, []);
+
+  const setSidebarCollapsed = useCallback((collapsed: boolean) => {
+    setPersistedState((prev) => ({ ...prev, sidebarCollapsed: collapsed }));
+  }, []);
+
+  const updateSettings = useCallback((patch: Partial<Settings>) => {
+    setPersistedState((prev) => ({ ...prev, settings: { ...prev.settings, ...patch } }));
+  }, []);
+
+  // ── Memoised context value ────────────────────────────────────────────────
   const value = useMemo<PlatformContextValue>(
     () => ({
       ready,
       user,
-      writings: mongoWritings.length > 0 ? mongoWritings : [],
+      writings: mongoWritings,
       bookmarks,
       settings,
       selectedSidebarPath,
       sidebarCollapsed,
-      signIn: async (email, password) => {
-        console.log('[PlatformContext] signIn called with:', email);
-        try {
-          const response = await apiClient.signIn(email, password);
-          console.log('[PlatformContext] signIn success:', response);
-          setPersistedState((prev) => ({
-            ...prev,
-            user: {
-              id: response.data.user.id,
-              name: response.data.user.name,
-              avatar: "https://images.unsplash.com/photo-1599566150163-29194dcaad36?w=240&q=80",
-              mode: "member",
-            },
-          }));
-        } catch (error) {
-          console.error('[PlatformContext] Sign in failed:', error);
-          // Fallback to demo mode if API fails
-          console.log('[PlatformContext] Falling back to demo mode');
-          setPersistedState((prev) => ({
-            ...prev,
-            user: {
-              id: "u-demo",
-              name: email.split("@")[0] || "Writer",
-              avatar: "https://images.unsplash.com/photo-1599566150163-29194dcaad36?w=240&q=80",
-              mode: "member",
-            },
-          }));
-        }
-      },
-      signUp: async (email, password, name) => {
-        console.log('[PlatformContext] signUp called with:', email, name);
-        try {
-          const response = await apiClient.signUp(email, name || "New Writer", password);
-          console.log('[PlatformContext] signUp success:', response);
-          setPersistedState((prev) => ({
-            ...prev,
-            user: {
-              id: response.data.user.id,
-              name: response.data.user.name,
-              avatar: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=240&q=80",
-              mode: "member",
-            },
-          }));
-        } catch (error) {
-          console.error('[PlatformContext] Sign up failed:', error);
-          // Fallback to demo mode if API fails
-          console.log('[PlatformContext] Falling back to demo mode');
-          setPersistedState((prev) => ({
-            ...prev,
-            user: {
-              id: "u-new",
-              name: name || email.split("@")[0] || "New Writer",
-              avatar: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=240&q=80",
-              mode: "member",
-            },
-          }));
-        }
-      },
-      continueAsGuest: async () => {
-        setPersistedState((prev) => ({
-          ...prev,
-          user: {
-            id: "u-guest",
-            name: "Guest Writer",
-            avatar: "https://images.unsplash.com/photo-1527980965255-d3b416303d12?w=240&q=80",
-            mode: "guest",
-          },
-        }));
-      },
-      signOut: () => {
-        apiClient.signOut();
-        setPersistedState((prev) => ({ ...prev, user: null }));
-      },
-      toggleBookmark: (writingId) =>
-        setPersistedState((prev) => ({
-          ...prev,
-          bookmarks: prev.bookmarks.includes(writingId)
-            ? prev.bookmarks.filter((id) => id !== writingId)
-            : [writingId, ...prev.bookmarks],
-        })),
-      isBookmarked: (writingId) => bookmarks.includes(writingId),
-      saveSidebarPath: (path) =>
-        setPersistedState((prev) => ({ ...prev, selectedSidebarPath: path })),
-      setSidebarCollapsed: (collapsed) =>
-        setPersistedState((prev) => ({ ...prev, sidebarCollapsed: collapsed })),
-      updateSettings: (patch) =>
-        setPersistedState((prev) => ({ ...prev, settings: { ...prev.settings, ...patch } })),
+      signIn,
+      signUp,
+      continueAsGuest,
+      signOut,
+      toggleBookmark,
+      isBookmarked,
+      saveSidebarPath,
+      setSidebarCollapsed,
+      updateSettings,
     }),
-    [bookmarks, ready, selectedSidebarPath, settings, sidebarCollapsed, user],
+    [
+      ready, user, mongoWritings, bookmarks, settings,
+      selectedSidebarPath, sidebarCollapsed,
+      signIn, signUp, continueAsGuest, signOut,
+      toggleBookmark, isBookmarked,
+      saveSidebarPath, setSidebarCollapsed, updateSettings,
+    ],
   );
 
   return <PlatformContext.Provider value={value}>{children}</PlatformContext.Provider>;
@@ -318,10 +323,4 @@ export function useDemoAnalytics() {
     writingActivity: WRITING_ACTIVITY,
     languageDistribution: LANGUAGE_DISTRIBUTION,
   };
-}
-
-function wait(ms: number) {
-  return new Promise<void>((resolve) => {
-    setTimeout(resolve, ms);
-  });
 }

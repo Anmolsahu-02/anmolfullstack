@@ -19,8 +19,19 @@ app.disable('x-powered-by');
 app.use(helmet());
 app.use(
   cors({
-    origin: env.CORS_ORIGIN === '*' ? true : env.CORS_ORIGIN,
-    credentials: true
+    origin: (origin, callback) => {
+      // Allow requests with no origin (curl, mobile apps, server-to-server)
+      if (!origin) return callback(null, true);
+      const allowed = (env.CORS_ORIGIN || '*')
+        .split(',')
+        .map((o) => o.trim());
+      if (allowed.includes('*') || allowed.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error(`CORS: origin ${origin} not allowed`));
+      }
+    },
+    credentials: true,
   })
 );
 app.use(compression());

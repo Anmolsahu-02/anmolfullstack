@@ -2,6 +2,7 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import { getRouter } from "./router";
 import { RouterProvider } from "@tanstack/react-router";
+import "./styles.css";
 import "./lib/i18n";
 
 const router = getRouter();

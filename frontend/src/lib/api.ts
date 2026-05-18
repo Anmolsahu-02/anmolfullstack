@@ -33,19 +33,20 @@ interface Content {
   genre: string;
   language: string;
   contentType: 'lyrics' | 'story' | 'poem' | 'screenplay';
-  category?: string; // For frontend compatibility
+  category?: string;
   quillDelta: QuillDelta;
   authorId: string;
   tags: string[];
   bookmarkCount: number;
   ratingSum: number;
   ratingCount: number;
+  status: 'draft' | 'published';
   rating?: number;
   excerpt?: string;
   publishedAt?: string;
   createdAt: string;
   updatedAt: string;
-  versions?: Array<{ versionId: string; delta: QuillDelta; editedAt: string }>;
+  versions?: Array<{ versionId: string; label?: string; editedAt: string }>;
   isDeleted: boolean;
 }
 
@@ -138,17 +139,17 @@ class APIClient {
   }
 
   // Auth methods
-  async signUp(email: string, name: string, password: string) {
-    const data = await this.post<{ data: { token: string; user: { id: string; name: string } } }>(
+  async signUp(email: string, name: string, password: string, role: 'writer' | 'reader' = 'writer') {
+    const data = await this.post<{ data: { token: string; user: { id: string; name: string; role: 'writer' | 'reader' } } }>(
       '/auth/register',
-      { email, name, password }
+      { email, name, password, role }
     );
     this.setToken(data.data.token);
     return data;
   }
 
   async signIn(email: string, password: string) {
-    const data = await this.post<{ data: { token: string; user: { id: string; name: string } } }>(
+    const data = await this.post<{ data: { token: string; user: { id: string; name: string; role: 'writer' | 'reader' } } }>(
       '/auth/login',
       { email, password }
     );
@@ -183,9 +184,16 @@ class APIClient {
     return this.patch(`/content/${contentId}/autosave`, { delta });
   }
 
+  async updateMeta(
+    contentId: string,
+    meta: { title?: string; genre?: string; language?: string; contentType?: string }
+  ): Promise<{ data: Content }> {
+    return this.patch(`/content/${contentId}/meta`, meta);
+  }
+
   async saveVersion(
     contentId: string,
-    data: { delta: QuillDelta; versionName?: string }
+    data: { delta: QuillDelta; label?: string }
   ): Promise<{ data: Content }> {
     return this.post(`/content/${contentId}/versions`, data);
   }
@@ -197,12 +205,49 @@ class APIClient {
   async restoreVersion(
     contentId: string,
     versionId: string
-  ): Promise<{ data: { restored: boolean } }> {
-    return this.post(`/content/${contentId}/versions/${versionId}/restore`, {});
+  ): Promise<{ success: boolean; data: unknown }> {
+    return this.post(`/content/${contentId}/restore/${versionId}`, {});
   }
 
-  async deleteContent(contentId: string): Promise<{ data: { deleted: boolean } }> {
+  async deleteContent(contentId: string): Promise<{ success: boolean; deleted: boolean }> {
     return this.delete(`/content/${contentId}`);
+  }
+
+  async browseContent(params?: {
+    genre?: string;
+    language?: string;
+    contentType?: string;
+    sort?: 'latest' | 'bookmarks' | 'rating';
+    cursor?: string;
+  }): Promise<{ success: boolean; data: Content[] }> {
+    const p = new URLSearchParams();
+    if (params?.genre) p.append('genre', params.genre);
+    if (params?.language) p.append('language', params.language);
+    if (params?.contentType) p.append('contentType', params.contentType);
+    if (params?.sort) p.append('sort', params.sort);
+    if (params?.cursor) p.append('cursor', params.cursor);
+    const qs = p.toString();
+    return this.get(`/content${qs ? `?${qs}` : ''}`);
+  }
+
+  async getDrafts(): Promise<{ success: boolean; data: Content[] }> {
+    return this.get('/content/drafts');
+  }
+
+  async getMyPublished(): Promise<{ success: boolean; data: Content[] }> {
+    return this.get('/content/my-published');
+  }
+
+  async getMyBookmarks(): Promise<{ success: boolean; data: Content[] }> {
+    return this.get('/content/my-bookmarks');
+  }
+
+  async publishContent(contentId: string): Promise<{ success: boolean; data: Content }> {
+    return this.post(`/content/${contentId}/publish`, {});
+  }
+
+  async unpublishContent(contentId: string): Promise<{ success: boolean; data: Content }> {
+    return this.post(`/content/${contentId}/unpublish`, {});
   }
 
   async searchContent(
@@ -231,12 +276,8 @@ class APIClient {
     return this.get(`/content/by-language?${params.toString()}`);
   }
 
-  async bookmarkContent(contentId: string): Promise<{ data: { bookmarked: boolean; count: number } }> {
+  async toggleBookmark(contentId: string): Promise<{ success: boolean; data: { bookmarked: boolean; count: number } }> {
     return this.post(`/content/${contentId}/bookmark`, {});
-  }
-
-  async unbookmarkContent(contentId: string): Promise<{ data: { bookmarked: boolean; count: number } }> {
-    return this.post(`/content/${contentId}/unbookmark`, {});
   }
 
   async rateContent(contentId: string, score: number): Promise<{ data: { rated: boolean; avg: number; count: number } }> {

@@ -6,15 +6,12 @@ import {
   createRootRouteWithContext,
   useRouter,
   useRouterState,
-  HeadContent,
-  Scripts,
 } from "@tanstack/react-router";
 import { AnimatePresence, motion } from "motion/react";
 import { I18nextProvider } from "react-i18next";
 
-import appCss from "../styles.css?url";
 import { PlatformProvider } from "@/context/platform-context";
-import i18n from "@/lib/i18n"; // Initialize i18n
+import i18n from "@/lib/i18n";
 
 function NotFoundComponent() {
   return (
@@ -74,60 +71,17 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
 }
 
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
-  head: () => ({
-    meta: [
-      { charSet: "utf-8" },
-      { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "AKSHAR — Where stories stay alive" },
-      {
-        name: "description",
-        content:
-          "A multilingual home for Indian poets, lyricists, storytellers, and screenplay writers.",
-      },
-      { name: "author", content: "AKSHAR" },
-      { property: "og:title", content: "AKSHAR — Where stories stay alive" },
-      {
-        property: "og:description",
-        content:
-          "A multilingual home for Indian poets, lyricists, storytellers, and screenplay writers.",
-      },
-      { property: "og:type", content: "website" },
-      { name: "twitter:card", content: "summary" },
-      { name: "twitter:site", content: "@Lovable" },
-    ],
-    links: [
-      {
-        rel: "stylesheet",
-        href: appCss,
-      },
-    ],
-  }),
-  shellComponent: RootShell,
   component: RootComponent,
   notFoundComponent: NotFoundComponent,
   errorComponent: ErrorComponent,
 });
-
-function RootShell({ children }: { children: React.ReactNode }) {
-  return (
-    <html lang="en">
-      <head>
-        <HeadContent />
-      </head>
-      <body>
-        {children}
-        <Scripts />
-      </body>
-    </html>
-  );
-}
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
   const pathname = useRouterState({
     select: (state) => state.location.pathname,
   });
-  
+
   const loadingFallback = (
     <div className="min-h-screen grid place-items-center bg-background px-4">
       <div className="text-center space-y-3">
@@ -142,28 +96,20 @@ function RootComponent() {
       <QueryClientProvider client={queryClient}>
         <PlatformProvider>
           <Suspense fallback={loadingFallback}>
+            <AnimatePresence mode="wait">
               <motion.div
                 key={pathname}
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.35, ease: "easeOut" }}
+                exit={{ opacity: 0, y: -4 }}
+                transition={{ duration: 0.3, ease: "easeOut" }}
               >
                 <Outlet />
               </motion.div>
+            </AnimatePresence>
           </Suspense>
         </PlatformProvider>
       </QueryClientProvider>
     </I18nextProvider>
-  );
-}
-
-function RouteLoadingState() {
-  return (
-    <div className="min-h-screen grid place-items-center bg-background px-4">
-      <div className="text-center space-y-3">
-        <div className="mx-auto h-10 w-10 rounded-full border-2 border-foreground/15 border-t-foreground/60 animate-spin" />
-        <p className="text-sm uppercase tracking-[0.2em] text-foreground/55">Loading studio</p>
-      </div>
-    </div>
   );
 }

@@ -4,8 +4,8 @@ const userSchema = new mongoose.Schema(
   {
     name: { type: String, trim: true, maxlength: 120 },
     email: { type: String, trim: true, lowercase: true, unique: true, sparse: true },
-    password: { type: String, maxlength: 100 },
-    roles: { type: [String], default: ['writer'] }
+    passwordHash: { type: String, maxlength: 100 },
+    role: { type: String, enum: ['writer', 'reader'], default: 'writer' }
   },
   {
     timestamps: true,
@@ -14,4 +14,3 @@ const userSchema = new mongoose.Schema(
 );
 
 module.exports = mongoose.model('User', userSchema);
-

@@ -14,8 +14,7 @@ function authenticate(req, res, next) {
     const payload = jwt.verify(token, env.JWT_SECRET);
     req.user = {
       id: payload.sub || payload.id,
-      email: payload.email,
-      roles: Array.isArray(payload.roles) ? payload.roles : []
+      role: payload.role || null
     };
 
     if (!req.user.id) {

@@ -11,6 +11,12 @@ const versionSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.Mixed,
       required: true
     },
+    label: {
+      type: String,
+      trim: true,
+      maxlength: 60,
+      default: 'Auto-save'
+    },
     editedAt: {
       type: Date,
       required: true,
@@ -55,6 +61,12 @@ const contentSchema = new mongoose.Schema(
     bookmarkCount: { type: Number, default: 0, min: 0 },
     ratingSum: { type: Number, default: 0, min: 0 },
     ratingCount: { type: Number, default: 0, min: 0 },
+    status: {
+      type: String,
+      enum: ['draft', 'published'],
+      default: 'draft',
+      index: true
+    },
     isDeleted: { type: Boolean, default: false },
     deletedAt: { type: Date, default: null }
   },

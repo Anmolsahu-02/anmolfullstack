@@ -10,68 +10,60 @@ export const Route = createFileRoute("/sign-in")({
 
 function SignInPage() {
   const navigate = useNavigate();
-  const { signIn, continueAsGuest, user } = usePlatform();
+  const { signIn, user } = usePlatform();
+  const [role, setRole] = useState<"writer" | "reader">("writer");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [loading, setLoading] = useState<"signin" | "guest" | null>(null);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
-    if (user) navigate({ to: "/dashboard" });
+    if (user) {
+      navigate({ to: user.role === "reader" ? "/dashboard/reader" : "/dashboard/writer" });
+    }
   }, [navigate, user]);
 
   const handleSignIn = async () => {
-    console.log('[SignIn] handleSignIn called', email);
     if (!email || !password) {
       setError("Please enter email and password");
       return;
     }
     try {
-      setLoading("signin");
+      setLoading(true);
       setError("");
-      console.log('[SignIn] Calling signIn...');
       await signIn(email, password);
-      console.log('[SignIn] signIn returned, navigating...');
-      navigate({ to: "/dashboard" });
     } catch (err) {
-      console.error('[SignIn] Error:', err);
-      setError(err instanceof Error ? err.message : "Sign in failed");
+      setError(err instanceof Error ? err.message : "Sign in failed. Check your credentials.");
     } finally {
-      setLoading(null); // Always reset loading state
-    }
-  };
-
-  const handleGuestLogin = async () => {
-    try {
-      setLoading("guest");
-      setError("");
-      await continueAsGuest();
-      navigate({ to: "/dashboard" });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Guest login failed");
-      setLoading(null);
+      setLoading(false);
     }
   };
 
   return (
     <main className="relative min-h-screen grid place-items-center overflow-hidden px-5 py-16 bg-gradient-cinematic">
-      <motion.div className="absolute inset-0 bg-spotlight opacity-65" />
-      <motion.div
-        animate={{ y: [0, -12, 0], opacity: [0.22, 0.32, 0.22] }}
-        transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
-        className="absolute left-10 top-16 w-56 h-56 rounded-full blur-3xl"
-        style={{ background: "var(--gold)" }}
+      {/* CSS-animated background orbs — GPU-only, never blocks inputs */}
+      <div
+        className="absolute left-10 top-16 w-56 h-56 rounded-full blur-3xl pointer-events-none"
+        style={{
+          background: "var(--gold)",
+          opacity: 0.25,
+          animation: "float-a 8s ease-in-out infinite",
+        }}
       />
-      <motion.div
-        animate={{ y: [0, 16, 0], opacity: [0.18, 0.28, 0.18] }}
-        transition={{ duration: 11, repeat: Infinity, ease: "easeInOut" }}
-        className="absolute right-8 bottom-10 w-64 h-64 rounded-full blur-3xl"
-        style={{ background: "var(--maroon)" }}
+      <div
+        className="absolute right-8 bottom-10 w-64 h-64 rounded-full blur-3xl pointer-events-none"
+        style={{
+          background: "var(--maroon)",
+          opacity: 0.22,
+          animation: "float-b 11s ease-in-out infinite",
+        }}
       />
 
+      {/* Card — one-time entrance only, no looping */}
       <motion.section
         initial={{ opacity: 0, y: 18 }}
         animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4 }}
         className="relative z-10 w-full max-w-lg paper-texture border border-foreground/15 rounded-2xl shadow-elevated p-7 md:p-9"
       >
         <p className="font-hand text-2xl text-center mb-1" style={{ color: "var(--maroon)" }}>
@@ -84,15 +76,75 @@ function SignInPage() {
           Return to your writing desk and continue the manuscript.
         </p>
 
-        <div className="mt-8 space-y-4">
+        {/* Role Selector */}
+        <div className="mt-7">
+          <p className="text-xs uppercase tracking-[0.22em] text-foreground/55 mb-3 text-center">
+            I am a…
+          </p>
+          <div className="grid grid-cols-2 gap-3">
+            <button
+              id="role-writer-signin"
+              type="button"
+              onClick={() => setRole("writer")}
+              className="relative flex flex-col items-center gap-2 rounded-xl border-2 px-4 py-4 transition-all duration-200"
+              style={{
+                borderColor: role === "writer" ? "var(--ink)" : "rgba(0,0,0,0.15)",
+                background: role === "writer" ? "var(--ink)" : "transparent",
+                color: role === "writer" ? "var(--primary-foreground)" : "inherit",
+              }}
+            >
+
+              <span className="text-sm font-semibold tracking-wide">Writer</span>
+              <span className="text-xs opacity-70">Create &amp; publish</span>
+              {role === "writer" && (
+                <span
+                  className="absolute -top-2 -right-2 w-5 h-5 rounded-full flex items-center justify-center text-xs"
+                  style={{ background: "var(--gold)", color: "#000" }}
+                >
+                  ✓
+                </span>
+              )}
+            </button>
+
+            <button
+              id="role-reader-signin"
+              type="button"
+              onClick={() => setRole("reader")}
+              className="relative flex flex-col items-center gap-2 rounded-xl border-2 px-4 py-4 transition-all duration-200"
+              style={{
+                borderColor: role === "reader" ? "var(--maroon)" : "rgba(0,0,0,0.15)",
+                background: role === "reader" ? "var(--maroon)" : "transparent",
+                color: role === "reader" ? "#fff" : "inherit",
+              }}
+            >
+
+              <span className="text-sm font-semibold tracking-wide">Reader</span>
+              <span className="text-xs opacity-70">Browse &amp; discover</span>
+              {role === "reader" && (
+                <span
+                  className="absolute -top-2 -right-2 w-5 h-5 rounded-full flex items-center justify-center text-xs"
+                  style={{ background: "var(--gold)", color: "#000" }}
+                >
+                  ✓
+                </span>
+              )}
+            </button>
+          </div>
+        </div>
+
+        <form
+          className="mt-6 space-y-4"
+          onSubmit={(e) => { e.preventDefault(); handleSignIn(); }}
+        >
           <div>
             <label className="block text-xs uppercase tracking-[0.22em] text-foreground/55 mb-2">
               Email
             </label>
             <input
+              id="signin-email"
               type="email"
               value={email}
-              onChange={(event) => setEmail(event.target.value)}
+              onChange={(e) => setEmail(e.target.value)}
               placeholder="aarav@example.com"
               className="w-full rounded-xl border border-foreground/15 bg-background/70 px-4 py-3 outline-none focus:border-foreground/40"
             />
@@ -103,9 +155,10 @@ function SignInPage() {
               Password
             </label>
             <input
+              id="signin-password"
               type="password"
               value={password}
-              onChange={(event) => setPassword(event.target.value)}
+              onChange={(e) => setPassword(e.target.value)}
               placeholder="••••••••"
               className="w-full rounded-xl border border-foreground/15 bg-background/70 px-4 py-3 outline-none focus:border-foreground/40"
             />
@@ -118,28 +171,19 @@ function SignInPage() {
           )}
 
           <button
-            onClick={handleSignIn}
-            disabled={loading !== null}
+            id="signin-submit"
+            type="submit"
+            disabled={loading}
             className="w-full h-11 rounded-full bg-gradient-ink text-primary-foreground uppercase tracking-[0.2em] text-xs inline-flex items-center justify-center gap-2 disabled:opacity-50"
           >
-            {loading === "signin" ? (
+            {loading ? (
               <LoaderCircle className="w-4 h-4 animate-spin" />
             ) : (
               "Enter Studio"
             )}
           </button>
-          <button
-            onClick={handleGuestLogin}
-            disabled={loading !== null}
-            className="w-full h-11 rounded-full border border-foreground/20 uppercase tracking-[0.2em] text-xs hover:bg-foreground hover:text-background transition-colors inline-flex items-center justify-center gap-2 disabled:opacity-50"
-          >
-            {loading === "guest" ? (
-              <LoaderCircle className="w-4 h-4 animate-spin" />
-            ) : (
-              "Continue as Guest"
-            )}
-          </button>
-        </div>
+        </form>
+
         <p className="mt-6 text-center text-sm text-foreground/65">
           New here?{" "}
           <Link to="/sign-up" className="ink-underline text-foreground">

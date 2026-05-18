@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { motion } from "motion/react";
-import { Clock4, FilePenLine } from "lucide-react";
+import { Clock4, FilePenLine, Lock } from "lucide-react";
 import { PlatformShell } from "@/components/platform/platform-shell";
 import { useDemoAnalytics, usePlatform } from "@/context/platform-context";
 
@@ -9,9 +9,33 @@ export const Route = createFileRoute("/drafts")({
 });
 
 function DraftsPage() {
-  const { ready, writings } = usePlatform();
+  const { ready, writings, user } = usePlatform();
   const analytics = useDemoAnalytics();
   const drafts = writings.slice(0, 5);
+
+  if (!user) {
+    return (
+      <PlatformShell title="Drafts" subtitle="Unpublished pages, living snapshots, and return points for your process.">
+        <section className="paper-texture rounded-xl border border-foreground/10 p-8 shadow-paper flex flex-col items-center justify-center gap-4 text-center">
+          <Lock className="w-12 h-12 text-foreground/50" />
+          <p className="font-serif-lit italic text-foreground/70">Sign in to access your drafts.</p>
+        </section>
+      </PlatformShell>
+    );
+  }
+
+  if (user.role === 'reader') {
+    return (
+      <PlatformShell title="Drafts" subtitle="Unpublished pages, living snapshots, and return points for your process.">
+        <section className="paper-texture rounded-xl border border-foreground/10 p-8 shadow-paper flex flex-col items-center justify-center gap-4 text-center">
+          <Lock className="w-12 h-12 text-foreground/50" />
+          <h2 className="font-display text-2xl" style={{ color: 'var(--ink)' }}>Writers only</h2>
+          <p className="font-serif-lit italic text-foreground/70">Drafts are exclusive to writers. Explore and bookmark content from the library instead.</p>
+          <Link to="/explore" className="mt-2 inline-flex h-10 px-6 rounded-full bg-gradient-ink text-primary-foreground text-xs uppercase tracking-[0.2em] items-center">Explore library</Link>
+        </section>
+      </PlatformShell>
+    );
+  }
 
   return (
     <PlatformShell

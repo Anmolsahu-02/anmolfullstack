@@ -17,12 +17,15 @@ import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as ScreenplaysRouteImport } from './routes/screenplays'
 import { Route as ProfileRouteImport } from './routes/profile'
 import { Route as PoetryRouteImport } from './routes/poetry'
+import { Route as MyWritingsRouteImport } from './routes/my-writings'
 import { Route as LyricsRouteImport } from './routes/lyrics'
 import { Route as LibraryRouteImport } from './routes/library'
 import { Route as ExploreRouteImport } from './routes/explore'
 import { Route as EditorRouteImport } from './routes/editor'
 import { Route as DraftsRouteImport } from './routes/drafts'
 import { Route as DashboardRouteImport } from './routes/dashboard'
+import { Route as DashboardWriterRouteImport } from './routes/dashboard/writer'
+import { Route as DashboardReaderRouteImport } from './routes/dashboard/reader'
 import { Route as BookmarksRouteImport } from './routes/bookmarks'
 import { Route as AnalyticsRouteImport } from './routes/analytics'
 import { Route as IndexRouteImport } from './routes/index'
@@ -72,6 +75,11 @@ const LyricsRoute = LyricsRouteImport.update({
   path: '/lyrics',
   getParentRoute: () => rootRouteImport,
 } as any)
+const MyWritingsRoute = MyWritingsRouteImport.update({
+  id: '/my-writings',
+  path: '/my-writings',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const LibraryRoute = LibraryRouteImport.update({
   id: '/library',
   path: '/library',
@@ -97,6 +105,16 @@ const DashboardRoute = DashboardRouteImport.update({
   path: '/dashboard',
   getParentRoute: () => rootRouteImport,
 } as any)
+const DashboardWriterRoute = DashboardWriterRouteImport.update({
+  id: '/dashboard/writer',
+  path: '/dashboard/writer',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DashboardReaderRoute = DashboardReaderRouteImport.update({
+  id: '/dashboard/reader',
+  path: '/dashboard/reader',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const BookmarksRoute = BookmarksRouteImport.update({
   id: '/bookmarks',
   path: '/bookmarks',
@@ -118,9 +136,12 @@ export interface FileRoutesByFullPath {
   '/analytics': typeof AnalyticsRoute
   '/bookmarks': typeof BookmarksRoute
   '/dashboard': typeof DashboardRoute
+  '/dashboard/writer': typeof DashboardWriterRoute
+  '/dashboard/reader': typeof DashboardReaderRoute
   '/drafts': typeof DraftsRoute
   '/editor': typeof EditorRoute
   '/explore': typeof ExploreRoute
+  '/my-writings': typeof MyWritingsRoute
   '/library': typeof LibraryRoute
   '/lyrics': typeof LyricsRoute
   '/poetry': typeof PoetryRoute
@@ -137,9 +158,12 @@ export interface FileRoutesByTo {
   '/analytics': typeof AnalyticsRoute
   '/bookmarks': typeof BookmarksRoute
   '/dashboard': typeof DashboardRoute
+  '/dashboard/writer': typeof DashboardWriterRoute
+  '/dashboard/reader': typeof DashboardReaderRoute
   '/drafts': typeof DraftsRoute
   '/editor': typeof EditorRoute
   '/explore': typeof ExploreRoute
+  '/my-writings': typeof MyWritingsRoute
   '/library': typeof LibraryRoute
   '/lyrics': typeof LyricsRoute
   '/poetry': typeof PoetryRoute
@@ -157,6 +181,8 @@ export interface FileRoutesById {
   '/analytics': typeof AnalyticsRoute
   '/bookmarks': typeof BookmarksRoute
   '/dashboard': typeof DashboardRoute
+  '/dashboard/writer': typeof DashboardWriterRoute
+  '/dashboard/reader': typeof DashboardReaderRoute
   '/drafts': typeof DraftsRoute
   '/editor': typeof EditorRoute
   '/explore': typeof ExploreRoute
@@ -174,61 +200,69 @@ export interface FileRoutesById {
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
-    | '/'
-    | '/analytics'
-    | '/bookmarks'
-    | '/dashboard'
-    | '/drafts'
-    | '/editor'
-    | '/explore'
-    | '/library'
-    | '/lyrics'
-    | '/poetry'
-    | '/profile'
-    | '/screenplays'
-    | '/settings'
-    | '/sign-in'
-    | '/sign-up'
-    | '/stories'
-    | '/version-history'
+  | '/'
+  | '/analytics'
+  | '/bookmarks'
+  | '/dashboard'
+  | '/dashboard/writer'
+  | '/dashboard/reader'
+  | '/drafts'
+  | '/editor'
+  | '/explore'
+  | '/library'
+  | '/lyrics'
+  | '/poetry'
+  | '/profile'
+  | '/screenplays'
+  | '/settings'
+  | '/sign-in'
+  | '/sign-up'
+  | '/stories'
+  | '/version-history'
   fileRoutesByTo: FileRoutesByTo
   to:
-    | '/'
-    | '/analytics'
-    | '/bookmarks'
-    | '/dashboard'
-    | '/drafts'
-    | '/editor'
-    | '/explore'
-    | '/library'
-    | '/lyrics'
-    | '/poetry'
-    | '/profile'
-    | '/screenplays'
-    | '/settings'
-    | '/sign-in'
-    | '/sign-up'
-    | '/stories'
-    | '/version-history'
+  | '/'
+  | '/analytics'
+  | '/bookmarks'
+  | '/dashboard'
+  | '/dashboard/writer'
+  | '/dashboard/reader'
+  | '/drafts'
+  | '/editor'
+  | '/explore'
+  | '/library'
+  | '/my-writings'
+  | '/lyrics'
+  | '/poetry'
+  | '/profile'
+  | '/screenplays'
+  | '/settings'
+  | '/sign-in'
+  | '/sign-up'
+  | '/stories'
+  | '/version-history'
   id:
-    | '__root__'
-    | '/'
-    | '/analytics'
-    | '/bookmarks'
-    | '/dashboard'
-    | '/drafts'
-    | '/editor'
-    | '/explore'
-    | '/library'
-    | '/lyrics'
-    | '/poetry'
-    | '/profile'
-    | '/screenplays'
-    | '/settings'
-    | '/sign-in'
-    | '/sign-up'
-    | '/stories'
-    | '/version-history'
+  | '__root__'
+  | '/'
+  | '/analytics'
+  | '/bookmarks'
+  | '/dashboard'
+  | '/dashboard/writer'
+  | '/dashboard/reader'
+  | '/drafts'
+  | '/editor'
+  | '/explore'
+  | '/library'
+  | '/my-writings'
+  | '/lyrics'
+  | '/poetry'
+  | '/profile'
+  | '/screenplays'
+  | '/settings'
+  | '/sign-in'
+  | '/sign-up'
+  | '/stories'
+  | '/version-history'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -236,9 +270,12 @@ export interface RootRouteChildren {
   AnalyticsRoute: typeof AnalyticsRoute
   BookmarksRoute: typeof BookmarksRoute
   DashboardRoute: typeof DashboardRoute
+  DashboardWriterRoute: typeof DashboardWriterRoute
+  DashboardReaderRoute: typeof DashboardReaderRoute
   DraftsRoute: typeof DraftsRoute
   EditorRoute: typeof EditorRoute
   ExploreRoute: typeof ExploreRoute
+  MyWritingsRoute: typeof MyWritingsRoute
   LibraryRoute: typeof LibraryRoute
   LyricsRoute: typeof LyricsRoute
   PoetryRoute: typeof PoetryRoute
@@ -316,6 +353,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LyricsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/my-writings': {
+      id: '/my-writings'
+      path: '/my-writings'
+      fullPath: '/my-writings'
+      preLoaderRoute: typeof MyWritingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/library': {
       id: '/library'
       path: '/library'
@@ -351,6 +395,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/dashboard/writer': {
+      id: '/dashboard/writer'
+      path: '/writer'
+      fullPath: '/dashboard/writer'
+      preLoaderRoute: typeof DashboardWriterRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/dashboard/reader': {
+      id: '/dashboard/reader'
+      path: '/reader'
+      fullPath: '/dashboard/reader'
+      preLoaderRoute: typeof DashboardReaderRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/bookmarks': {
       id: '/bookmarks'
       path: '/bookmarks'
@@ -380,9 +438,12 @@ const rootRouteChildren: RootRouteChildren = {
   AnalyticsRoute: AnalyticsRoute,
   BookmarksRoute: BookmarksRoute,
   DashboardRoute: DashboardRoute,
+  DashboardWriterRoute: DashboardWriterRoute,
+  DashboardReaderRoute: DashboardReaderRoute,
   DraftsRoute: DraftsRoute,
   EditorRoute: EditorRoute,
   ExploreRoute: ExploreRoute,
+  MyWritingsRoute: MyWritingsRoute,
   LibraryRoute: LibraryRoute,
   LyricsRoute: LyricsRoute,
   PoetryRoute: PoetryRoute,
